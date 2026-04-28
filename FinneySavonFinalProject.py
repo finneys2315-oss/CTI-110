@@ -181,11 +181,11 @@ def describe_level(player, descriptions):
 def get_level_entity(level):
     return {
         1: "Watcher",
-        1: "The Animations",
-        2: "Smiler",
-        3: "Hound",
-        4: "Skin Stealer",
-        5: "The End"
+        2: "The Animations",
+        3: "Smiler",
+        4: "Hound",
+        5: "Skin Stealer",
+        6: "The End"
     }[level]
 
 def encounter_cost(player):
@@ -196,7 +196,7 @@ def encounter_cost(player):
 def encounter(player):
     entity = get_level_entity(player["level"])
     narrate(player, "\nYou feel the room change before you see anything at all.")
-    apply_random_debuff(player)
+
 
     if entity == "Watcher":
         narrate(player, "Something stands at the edge of the corridor, too far away to measure and too still to be alive. It tilts its head only after you notice it.")
@@ -207,6 +207,7 @@ def encounter(player):
                 narrate(player, "You force your eyes forward and keep moving. Behind you, the silence shifts with disappointment.")
                 change_stat(player, "fear", 6)
                 change_stat(player, "sanity", -4)
+                
             else:
                 game_over(player)
 
@@ -214,6 +215,7 @@ def encounter(player):
             if player["fear"] < 35:
                 narrate(player, "You do not move. After a long moment, the shape stops being a shape and becomes distance again.")
                 change_stat(player, "sanity", -3)
+                apply_random_debuff(player)
             else:
                 game_over(player)
 
@@ -237,6 +239,7 @@ def encounter(player):
                 narrate(player, "You refuse to feed it with your attention. The grin lingers, then fades into the walls.")
                 change_stat(player, "sanity", -5)
                 change_stat(player, "fear", 7)
+                apply_random_debuff(player)
             else:
                 game_over(player)
 
@@ -253,6 +256,7 @@ def encounter(player):
                 narrate(player, "You close your eyes and pray the thing in the darkness loses interest. When you open them again, nothing is where it was.")
                 change_stat(player, "sanity", -8)
                 change_stat(player, "fear", 12)
+                apply_random_debuff(player)
             else:
                 game_over(player)
         else:
@@ -276,6 +280,7 @@ def encounter(player):
                 narrate(player, "You sprint until the hallway blurs into a smear of yellow and shadow. Something behind you crashes into the wall, then resumes the chase.")
                 change_stat(player, "stamina", -35)
                 change_stat(player, "fear", 12)
+                apply_random_debuff(player)
             else:
                 game_over(player)
 
@@ -284,6 +289,7 @@ def encounter(player):
                 narrate(player, "You dive behind a broken cabinet and hold your breath. Claws scrape the floor just inches away, lingering far too long.")
                 change_stat(player, "stamina", -20)
                 change_stat(player, "fear", 9)
+                
             else:
                 game_over(player)
         else:
@@ -299,6 +305,7 @@ def encounter(player):
                 narrate(player, "Its answer arrives a second too late, and the voice slips in tone halfway through the sentence. Whatever it is, it is trying very hard to sound normal.")
                 change_stat(player, "sanity", -7)
                 change_stat(player, "fear", 8)
+                apply_random_debuff(player)
             else:
                 game_over(player)
 
@@ -348,7 +355,7 @@ def encounter(player):
         narrate(player, "You turn around and see the source of the laughing. Creatures that look they came off a 1980s cartoon and welding axes and swords that send a shiver down your spine.")
         choice = input("The animations are lunging at you while laughing manically, Do you RUN, HIDE, or LAUGH? ").lower()
 
-        if choice == "RUN":
+        if choice == "run":
             if player["stamina"] >= 35:
                 narrate(player, "You can ran as fast as your leg can manage. but the laugther follows behind ")
                 change_stat(player, "stamina", -20)
@@ -356,26 +363,46 @@ def encounter(player):
             else:
                 game_over_animations(player)
 
-        elif choice == "Hide":
+        elif choice == "hide":
             if player["sanity"] >= 50:
                 narrate(player,"You hide from the laughter, You really want to laugh at the situation you are in, but your mind refuses to give in to the madness.")
                 narrate(player, "You hear the laughter passed by, you then proceed to your own journey.")
                 change_stat(player, "sanity", -10)
-                change_stat(player, "Fear", -15)
+                change_stat(player, "fear", -15)
             else:
                 game_over_animations(player)
-        elif choice == "Laugh":
+        elif choice == "laugh":
             if player["sanity"] >= 80:
                 narrate(player, "You can't help but laugh at the absurdly of the situation you are in, the creatures join in the madness.")
                 narrate(player, "After a few minutes, the creatures proceed to go away and laughing all the same. You feel like you lost a part of yourself.")
                 change_stat(player, "sanity", -50)
-                change_stat(player, "Fear", +20)
+                change_stat(player, "fear", +20)
                 change_stat(player, "stamina", +40)
                 
             else:
                 game_over_animations(player)
 
 # ---------- EXPLORATION ----------
+def good_entity(player):
+    narrate(player, "\nSomething… different is here.")
+    narrate(player, "It does not feel hostile. It does not feel safe either. But it is calm.")
+
+    stats = ["sanity", "stamina", "fear"]
+    print("Choose a stat to restore:", ", ".join(stats))
+    choice = input("> ").lower()
+
+    if choice not in stats:
+        narrate(player, "You hesitate. The presence fades.")
+        return
+
+    if choice == "fear":
+        change_stat(player, "fear", -25)
+    else:
+        change_stat(player, choice, +30)
+
+    narrate(player, f"The presence touches your {choice}. Something improves… but you don't understand why.")
+
+
 def explore(player, descriptions):
     describe_level(player, descriptions)
 
@@ -384,8 +411,14 @@ def explore(player, descriptions):
 
     if player["level"] >= 2:
         choices.append("back")
-    if player["level"] >= 3:
-        choices.append("enter room")
+# Rare chance for early levels
+    if player["level"] in [1, 2]:
+        if random.randint(1, 100) <= 15:
+            choices.append("enter the dark room")
+
+# Normal unlock later
+    elif player["level"] >= 3:
+        choices.append("enter the dark room")
     if player["level"] >= 4:
         choices.append("go down")
 
@@ -415,10 +448,34 @@ def explore(player, descriptions):
         return
 
     # movement narration
-    if choice == "enter room":
-        narrate(player, "You push into the room. It is too empty to be safe, and too arranged to be accidental.")
+    if choice == "enter the dark room":
+        if player["fear"] >= 50:
+            narrate(player, "The fear of something being in a the room creep into your mind and you can't decide if worth the risk or not.")
+            narrate(player, "You then hear a chuckle coming from the dark area.")
+            change_stat(player, "fear", 3)
+            
+        elif player["fear"] <= 50:
+            narrate(player,"You enter the dark room and hear something shifting in the darkness...")
+
+    # GOOD ENTITY CHANCE (only if sanity is low)
+    if player["sanity"] < 40:
+        good_chance = max(5, 35 - (player["level"] * 6))
+        # higher level = MUCH lower chance
+
+        if random.randint(1, 100) <= good_chance:
+            good_entity(player)
+            return
+
+    # normal outcome
+    if random.randint(1, 100) > 55:
+        encounter(player)
+    else:
+        change_stat(player, "fear", 1)
+        
+        
+        #narrate(player, "You push into the room. It is too empty to be safe, and too arranged to be accidental.")
     elif choice == "go down":
-        narrate(player, "You descend a narrow stairwell that should not exist in a place like this. The steps feel damp and recently used.")
+    narrate(player, "You descend a narrow stairwell that should not exist in a place like this. The steps feel damp and recently used.")
     elif choice == "follow the whisper":
         narrate(player, "You follow the whisper because it sounds almost like your name, and because fear has started making your decisions for you.")
     else:
@@ -437,9 +494,10 @@ def rest(player):
     narrate(player, "\nYou stop moving. The silence grows heavy enough to press against your skin.")
 
     # small recovery only
-    change_stat(player, "sanity", +8)
-    change_stat(player, "stamina", +12)
+    change_stat(player, "sanity", +10)
+    change_stat(player, "stamina", +20)
     change_stat(player, "fear", -4)
+    process_debuffs(player)
 
     player["encounter_chance"] = min(90, player["encounter_chance"] + 18)
 
@@ -447,7 +505,6 @@ def rest(player):
     narrate(player, "The stillness feels wrong. The longer you stay, the more the room seems to notice that you have stopped.")
     if random.randint(1, 100) < 55:
         encounter(player)
-
 # ---------- MAIN ----------
 def main():
     name = input("Enter your name: ").strip()
