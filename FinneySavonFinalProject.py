@@ -1,6 +1,7 @@
 import random
 import time
 
+
 # ---------- PLAYER ----------
 def create_player(name):
     return {
@@ -12,11 +13,21 @@ def create_player(name):
         "alive": True,
         "encounter_chance": 10,
         "day": 0,          # hidden day schedule
-        "debuffs": []      # active debuffs
+        "debuffs": [],      # active debuffs
+        "encounter_cooldown": 0
     }
 
 def change_stat(player, stat, amount):
+    old_value = player[stat]
     player[stat] = max(0, min(100, player[stat] + amount))
+    new_value = player[stat]
+
+    if new_value != old_value:
+        diff = new_value - old_value
+        if diff > 0:
+            print(f"[{stat.upper()} +{diff}]")
+        else:
+            print(f"[{stat.upper()} {diff}]")
 
 # ---------- TEXT DISTORTION ----------
 def distort_text(text, sanity):
@@ -33,8 +44,13 @@ def distort_text(text, sanity):
         )
 
 def narrate(player, text):
-    print(distort_text(text, player["sanity"]))
-    time.sleep(0.6)
+    final_text = distort_text(text, player["sanity"])
+    
+    for char in final_text:
+        print(char, end="", flush=True)
+        time.sleep(0.015)  # speed (lower = faster)
+    
+    print()  # new line
 
 # ---------- GAME OVER ----------
 def check_sanity(player):
@@ -196,6 +212,7 @@ def encounter_cost(player):
 def encounter(player):
     entity = get_level_entity(player["level"])
     narrate(player, "\nYou feel the room change before you see anything at all.")
+    player["encounter_cooldown"] = 2
 
 
     if entity == "Watcher":
@@ -448,41 +465,41 @@ def explore(player, descriptions):
         return
 
     # movement narration
+        # movement narration
     if choice == "enter the dark room":
         if player["fear"] >= 50:
             narrate(player, "The fear of something being in a the room creep into your mind and you can't decide if worth the risk or not.")
             narrate(player, "You then hear a chuckle coming from the dark area.")
             change_stat(player, "fear", 3)
-            
-        elif player["fear"] <= 50:
-            narrate(player,"You enter the dark room and hear something shifting in the darkness...")
 
-    # GOOD ENTITY CHANCE (only if sanity is low)
-    if player["sanity"] < 40:
-        good_chance = max(5, 35 - (player["level"] * 6))
-        # higher level = MUCH lower chance
+        else:
+            narrate(player, "You enter the dark room and hear something shifting in the darkness...")
 
-        if random.randint(1, 100) <= good_chance:
-            good_entity(player)
-            return
+            # GOOD ENTITY CHANCE (only here, only dark room)
+            if player["sanity"] < 40:
+                good_chance = max(5, 35 - (player["level"] * 6))
+                if random.randint(1, 100) <= good_chance:
+                    good_entity(player)
+                    return
 
-    # normal outcome
-    if random.randint(1, 100) > 55:
-        encounter(player)
-    else:
-        change_stat(player, "fear", 1)
-        
-        
-        #narrate(player, "You push into the room. It is too empty to be safe, and too arranged to be accidental.")
+            # normal dark room outcome
+            if random.randint(1, 100) > 55:
+                encounter(player)
+            else:
+                change_stat(player, "fear", 1)
+
     elif choice == "go down":
-    narrate(player, "You descend a narrow stairwell that should not exist in a place like this. The steps feel damp and recently used.")
+        narrate(player, "You descend a narrow stairwell that should not exist in a place like this. The steps feel damp and recently used.")
+
     elif choice == "follow the whisper":
         narrate(player, "You follow the whisper because it sounds almost like your name, and because fear has started making your decisions for you.")
+        change_stat(player, "sanity", -20)
+        change_stat(player, "fear", 15)
+
     else:
         narrate(player, f"You move {choice}, deeper into the yellow maze.")
-
     # chance to progress deeper
-    progress_chance = 35 + (player["level"] * 8) - (player["fear"] // 10)
+    progress_chance = 35 + (player["level"] * 8) - (player["fear"] // 5)
     progress_chance = max(10, min(85, progress_chance))
 
     if random.randint(1, 100) <= progress_chance and player["level"] < 5:
@@ -494,17 +511,18 @@ def rest(player):
     narrate(player, "\nYou stop moving. The silence grows heavy enough to press against your skin.")
 
     # small recovery only
-    change_stat(player, "sanity", +10)
-    change_stat(player, "stamina", +20)
-    change_stat(player, "fear", -4)
+    change_stat(player, "sanity", 20)
+    change_stat(player, "stamina", +45)
+    change_stat(player, "fear", -10)
     process_debuffs(player)
 
     player["encounter_chance"] = min(90, player["encounter_chance"] + 18)
 
     # resting may still trigger something
     narrate(player, "The stillness feels wrong. The longer you stay, the more the room seems to notice that you have stopped.")
-    if random.randint(1, 100) < 55:
-        encounter(player)
+    if player["encounter_cooldown"] == 0:
+        if random.randint(1, 100) < 55:
+            encounter(player)
 # ---------- MAIN ----------
 def main():
     name = input("Enter your name: ").strip()
@@ -547,7 +565,10 @@ def main():
         if player["debuffs"]:
             print("Current debuffs:", ", ".join([f"{d['name']} ({d['days_left']} days)" for d in player["debuffs"]]))
 
-        action = input("\nDo you EXPLORE or REST? ").lower()
+        if player["stamina"] <= 0:
+            action = "rest"
+        else:
+            action = input("\nDo you EXPLORE or REST? ").lower()
 
         if action == "explore":
             explore(player, descriptions)
@@ -560,14 +581,21 @@ def main():
 
         advance_day(player)
 
-        if random.randint(1, 100) <= player["encounter_chance"]:
-            encounter(player)
-
+        if player["encounter_cooldown"] > 0:
+            player["encounter_cooldown"] -= 1
+        else:
+            if random.randint(1, 100) <= player["encounter_chance"]:
+                encounter(player)
         check_sanity(player)
 
         if player["stamina"] <= 0:
-            narrate(player, "\nYour legs fail beneath you. You cannot keep running forever.")
-            game_over(player)
+            narrate(player, "\nYour legs give out beneath you. You can’t keep moving.")
+            narrate(player, "You have no choice but to rest.")
+
+            rest(player)
+            advance_day(player)
+
+            continue
 
     print("\nEnd.")
 
